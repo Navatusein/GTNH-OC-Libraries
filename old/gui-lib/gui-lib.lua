@@ -2,7 +2,7 @@
 -- Author: CAHCAHbl4
 -- Edit: Navatusein
 -- License: MIT
--- Version: 2.10
+-- Version: 2.11
 
 local component = require("component")
 local term = require("term")
@@ -139,33 +139,37 @@ local formatters = {
   ---@param parts number
   ---@return string
   t = function(seconds, parts)
-    parts = (parts and parts or 4)
+    parts = (parts and tonumber(parts) or 4)
 
-    local units = {"y", "m", "d", "hr", "min", "sec"}
+    local time_units = {
+      {name = "y",   value = 31536000},
+      {name = "m",   value = 2592000},
+      {name = "d",    value = 86400},
+      {name = "hr",   value = 3600},
+      {name = "min",  value = 60},
+      {name = "sec",  value = 1}
+    }
+
+    if seconds < 1 then return "0 sec" end
+
     local result = {}
 
-    for i, v in ipairs({31104000, 2592000, 86400, 3600, 60}) do
-      if seconds >= v then
-        result[i] = math.floor(seconds / v)
-        seconds = seconds % v
+    for _, unit in ipairs(time_units) do
+      local unit_value = math.floor(seconds / unit.value)
+
+      if unit_value > 0 then
+        table.insert(result, unit_value .. " " .. unit.name)
+        seconds = seconds % unit.value
       end
+
+      if #result >= parts then break end
     end
 
-    result[4] = seconds
-
-    local resultString = ""
-    local i = 1
-    while parts ~= 0 and i ~= 5 do
-      if result[i] and result[i] > 0 then
-        if i > 1 and resultString ~= "" then
-          resultString = resultString .. " "
-        end
-        resultString = resultString .. result[i] .. " " .. units[i]
-        parts = parts - 1
-      end
-      i = i + 1
+    if #result == 0 then
+      return seconds .. " sec"
     end
-    return resultString
+
+    return table.concat(result, " ")
   end
 }
 
