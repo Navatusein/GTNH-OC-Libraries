@@ -2,6 +2,7 @@ local classBuilder = require("lib.class-builder.index")
 local tableUtilities = require("lib.table-utilities.index")
 
 ---@class ScrollListLoggerHandler
+---@field logs table<string>
 local scrollListLoggerHandler = {}
 
 ---Constructor
