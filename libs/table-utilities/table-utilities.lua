@@ -8,7 +8,7 @@ function tableUtilities.pushFront(data, value, maxSize)
   table.insert(data, 1, value)
 
   if maxSize ~= nil and #data > maxSize then
-    table.remove(table)
+    table.remove(data)
   end
 end
 

@@ -2,7 +2,7 @@
 Name: Table Utilities
 Author: Navatusein
 License: MIT
-Version: 1.0
+Version: 1.1
 Dependencies:
 --]]
 

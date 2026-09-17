@@ -58,9 +58,9 @@ function stringUtilities.split(string, delimiter)
   local splitted = {}
   local last_end = 1
 
-  for match in string:gmatch("(.-)"..delimiter) do
+  for match, position in string:gmatch("(.-)"..delimiter.."()") do
     table.insert(splitted, match)
-    last_end = #match + #delimiter + 1
+    last_end = position
   end
 
   local remaining = string:sub(last_end)
