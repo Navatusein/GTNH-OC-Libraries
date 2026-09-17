@@ -5,7 +5,6 @@ local shell = require("shell")
 local filesystem = require("filesystem")
 local computer = require("computer")
 
-
 local classBuilder = require("lib.class-builder.index")
 
 ---Compare two semver-style version strings (e.g. "1.2.10") component-wise.
@@ -18,14 +17,46 @@ local function compareVersions(a, b)
   while true do
     local aPart = aIter()
     local bPart = bIter()
-    if aPart == nil and bPart == nil then 
+
+    if aPart == nil and bPart == nil then
       return 0
     end
 
     local aNumber = tonumber(aPart) or 0
     local bNumber = tonumber(bPart) or 0
+
     if aNumber ~= bNumber then
       return aNumber < bNumber and -1 or 1
+    end
+  end
+end
+
+---@param timeout number
+---@return string
+local function readWithTimeout(timeout)
+  local input = ""
+
+  local startX, startY = term.getCursor()
+
+  while true do
+    local signal, _, char, code = event.pull(timeout, "key_down")
+
+    if signal == nil then
+      return ""
+    elseif code == 28 then
+      term.write("\n")
+      return input
+    elseif char and char >= 32 and char <= 126 then
+      input = input .. string.char(char)
+      term.write(string.char(char))
+    elseif code == 14 and #input > 0 then
+      input = string.sub(input, 1, #input - 1)
+
+      local calculatedX = startX + #input
+
+      term.setCursor(calculatedX, startY)
+      term.write(" ")
+      term.setCursor(calculatedX, startY)
     end
   end
 end
@@ -69,7 +100,7 @@ end
 
 ---Try auto update program
 function programUpdater:autoUpdate()
-  local isUpdateNeeded, isConfigUpdateNeeded, isGTNHUpdateNeeded, remoteVersion = self:isUpdateNeeded()
+  local isUpdateNeeded, isConfigUpdateNeeded, isSetupUpdateNeeded, isGTNHUpdateNeeded, remoteVersion = self:isUpdateNeeded()
   local currentVersion = self.program.version ~= nil and self.program.version.programVersion or "nil"
 
   term.setCursor(1, 1)
@@ -84,22 +115,26 @@ function programUpdater:autoUpdate()
   end
 
   term.clear()
-  term.write("Find new version: "..remoteVersion.programVersion.."\n")
+  term.write("Find new version: "..remoteVersion.programVersion.."\n\n")
 
   if isConfigUpdateNeeded then
     term.write("This update changes the format of the configuration file.\n")
-    term.write("It will be necessary to manually overwrite the configuration file.\n")
+    term.write("It will be necessary to manually overwrite the configuration file.\n\n")
+  end
+
+  if isSetupUpdateNeeded then
+    term.write("This update requires changes in the multiblock setup, without which program may not work.\n\n")
   end
 
   if isGTNHUpdateNeeded then
     term.write("This update needed GTNH version: " .. remoteVersion.gtnhVersion .. " or higher.\n")
-    term.write("If you're playing on an older version, the update might break the program.\n")
+    term.write("If you're playing on an older version, the update might break the program.\n\n")
   end
 
   term.write("Do you want to update [y/n]?\n")
   term.write("==>")
 
-  local userInput = io.read()
+  local userInput = readWithTimeout(60)
 
   if string.lower(userInput) ~= "y" then
     return
@@ -107,7 +142,7 @@ function programUpdater:autoUpdate()
 
   self:tryDownloadTarUtility()
 
-  local url = "https://github.com/"..self.program.repository.."/releases/latest/download/"..self.program.archiveName..".tar"
+  local url = "https://github.com/"..self.program.repository.."/releases/download/v"..remoteVersion.programVersion.."/"..self.program.archiveName..".tar"
 
   term.clear()
   term.write("Updating to version: "..remoteVersion.programVersion.."\n")
@@ -142,15 +177,19 @@ end
 ---@return ProgramVersion|nil
 ---@private
 function programUpdater:getLatestVersionNumber()
-  local versionFileUrl = "https://raw.githubusercontent.com/"..self.program.repository.."/refs/heads/main/version.lua"
+  local versionFileUrl = "https://raw.githubusercontent.com/"..self.program.repository.."/refs/heads/"..self.program.version.branch.."/version.lua"
 
-  local success, requestResult = pcall(internet.request, versionFileUrl)
+  local requestResult = internet.request(versionFileUrl)
+
+  if not requestResult then
+    return nil
+  end
+
+  local success, result = pcall(requestResult)
 
   if not success then
     return nil
   end
-
-  local result = ""
 
   for chunk in requestResult do
     result = result..chunk
@@ -162,25 +201,27 @@ end
 ---Check if update is needed
 ---@return boolean # Need program update
 ---@return boolean # Need config update
+---@return boolean # Need setup update
 ---@return boolean # Need gtnh update
 ---@return ProgramVersion|nil # Remote version
 ---@private
 function programUpdater:isUpdateNeeded()
   if self.program.version == nil or internet == nil then
-    return false, false, false, nil
+    return false, false, false, false, nil
   end
 
   local remoteVersion = self:getLatestVersionNumber()
 
   if remoteVersion == nil then
-    return false, false, false, nil
+    return false, false, false, false, nil
   end
 
   local isUpdateNeeded = compareVersions(remoteVersion.programVersion, self.program.version.programVersion) > 0
   local isConfigUpdateNeeded = remoteVersion.configVersion > self.program.version.configVersion
+  local isSetupUpdateNeeded = remoteVersion.setupVersion > self.program.version.setupVersion
   local isGTNHUpdateNeeded = compareVersions(remoteVersion.gtnhVersion, self.program.version.gtnhVersion) > 0
 
-  return isUpdateNeeded, isConfigUpdateNeeded, isGTNHUpdateNeeded, remoteVersion
+  return isUpdateNeeded, isConfigUpdateNeeded, isSetupUpdateNeeded, isGTNHUpdateNeeded, remoteVersion
 end
 
 ---Download and install tar utility if not installed

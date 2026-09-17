@@ -2,7 +2,7 @@
 Name: Program Controller
 Author: Navatusein
 License: MIT
-Version: 4.0
+Version: 4.1
 Dependencies: Class Builder
 --]]
 
